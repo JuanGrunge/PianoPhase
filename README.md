@@ -2,7 +2,7 @@
 
 Una visualización interactiva en el navegador (HTML + Canvas + Web Audio, sin dependencias externas) inspirada en *Piano Phase* (1967), de Steve Reich.
 
-🔗 **[Ver el proyecto en vivo](https://tu-usuario.github.io/tu-repo/)**
+🔗 **[Ver el proyecto en vivo](https://juangrunge.github.io/PianoPhase/)**
 
 
 ## Qué es esto
