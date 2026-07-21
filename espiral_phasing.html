@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>La Espiral — Phasing de 12 Notas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08080f;
+    --panel: rgba(255,255,255,0.02);
+    --line: rgba(255,255,255,0.08);
+    --ember: #c97a4a;   /* acento cálido, cobre — reemplaza al dorado genérico */
+    --ink: #e9e6dc;
+    --muted: #7a7f8c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Inter', sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 44px 20px 60px; min-height: 100vh; }
+
+  .eyebrow { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 38px; margin: 0 0 6px; text-align: center; }
+  .philosophy {
+    font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 16.5px;
+    color: var(--muted); max-width: 640px; text-align: center; line-height: 1.65; margin: 0 0 30px;
+  }
+  .philosophy b { color: var(--ember); font-style: normal; }
+
+  /* la tarjeta: pensada como una pieza física, no un panel de dashboard */
+  #stageWrap {
+    position: relative;
+    border-radius: 22px;
+    padding: 1px;
+    background: linear-gradient(155deg, rgba(201,122,74,0.18), rgba(255,255,255,0.03) 40%, rgba(90,60,120,0.12));
+  }
+  #stageInner {
+    position: relative;
+    border-radius: 21px;
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 60px rgba(0,0,0,0.6),
+      inset 0 1px 0 rgba(255,255,255,0.04),
+      0 30px 60px -20px rgba(0,0,0,0.7);
+  }
+  canvas { display: block; }
+
+  .goldFlash {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(201,122,74,0.28), transparent 65%);
+    opacity: 0; pointer-events: none; transition: opacity 0.6s ease;
+    mix-blend-mode: screen;
+  }
+
+  .controlRow {
+    display: flex; align-items: center; gap: 16px; margin-top: 24px; flex-wrap: wrap; justify-content: center;
+  }
+  button {
+    background: transparent; border: 1px solid var(--line); color: var(--ink);
+    padding: 9px 20px; border-radius: 999px; cursor: pointer; font-size: 13px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  button:hover { border-color: var(--ember); color: var(--ember); }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  .metronome { display: flex; align-items: center; gap: 8px; }
+
+  .volumeControl { display: flex; align-items: center; gap: 8px; }
+  .volumeIcon { font-size: 13px; opacity: 0.7; }
+  #volumeSlider {
+    width: 90px;
+    accent-color: var(--ember);
+  }
+  .led {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    box-shadow: none;
+    transition: background 0.4s ease-out, box-shadow 0.4s ease-out;
+  }
+  .led.on {
+    background: var(--ember);
+    box-shadow: 0 0 10px 3px rgba(201,122,74,0.8);
+    transition: background 0.03s ease-in, box-shadow 0.03s ease-in;
+  }
+  .metroLabel { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; }
+
+  .state { margin-top: 18px; font-size: 12px; color: var(--muted); letter-spacing: 0.5px; text-align: center; min-height: 18px; transition: color 0.4s; }
+  .state.unity { color: var(--ember); }
+  .timer { font-size: 12px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+  .legendItem { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+  .legendDot { width: 9px; height: 9px; border-radius: 50%; }
+
+  .caption { margin-top: 34px; max-width: 540px; font-size: 12.5px; line-height: 1.7; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+
+  <div class="eyebrow">Steve Reich · 1967</div>
+  <h1>Piano Phase</h1>
+  <p class="philosophy">
+    En 1967, Steve Reich escribió <i>Piano Phase</i> para dos pianistas tocando la misma
+    célula de doce notas. La idea nació de un accidente: en sus primeras piezas con cinta,
+    dos grabadoras idénticas se desincronizaban solas, por las pequeñas diferencias mecánicas
+    entre una y otra. Reich se preguntó qué pasaría si llevaba ese accidente a un escenario,
+    con dos personas en vez de dos máquinas. La partitura no da ningún número: solo le pide a
+    uno de los dos pianistas que acelere gradualmente, de oído, hasta encontrar de nuevo al
+    otro, un pulso más adelante. Como experimento: ¿qué pasa si esa idea, en vez de sentirse
+    de oído, se fija en un número (2%) y se convierte en espiral?
+  </p>
+
+  <div id="stageWrap">
+    <div id="stageInner">
+      <canvas id="stage" width="620" height="760"></canvas>
+      <div class="goldFlash" id="flash"></div>
+    </div>
+  </div>
+
+  <div class="controlRow">
+    <button id="toggleBtn">▶ Iniciar</button>
+    <button id="resetBtn">⟲ Reiniciar</button>
+    <button id="muteBtn">🔊 Silenciar</button>
+    <div class="volumeControl">
+      <span class="volumeIcon">🔉</span>
+      <input type="range" id="volumeSlider" min="0" max="1.2" step="0.01" value="0.7">
+    </div>
+    <div class="metronome">
+      <div class="led" id="led"></div>
+      <span class="metroLabel">90 bpm</span>
+    </div>
+  </div>
+
+  <div class="state" id="stateLabel">las dos espirales comienzan alineadas</div>
+  <div class="timer" id="timerDisplay">0:00 / vuelta completa ≈ 2:13</div>
+
+  <div class="legend" id="legend"></div>
+
+  <p class="caption">
+    Dale Iniciar aquí primero — el LED empieza a marcar el compás (90 bpm) sin sonido,
+    solo para que sientas el pulso antes de que entre el sonido real de las dos voces.
+    Cada color es una nota distinta de la célula (Mi, Fa♯, Si, Do♯, Re); como la melodía
+    se repite, el mismo color vuelve a aparecer en el mismo lugar de cada vuelta.
+    Observa cómo la espiral cobriza (Voz 2) gira lentamente sobre la de referencia (Voz 1)
+    hasta volver a calzar exactamente a los 2:13.
+  </p>
+
+<script>
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const cx = W/2, cy = 280;
+
+// Parámetros reales de Strudel — cambia solo estos si cambia el código musical
+const CPS = 90/60/4;
+const SPEED_RATIO = 1.02;
+const NOTES = ["e4","fs4","b4","cs5","d5","fs4","e4","cs5","b4","fs4","d5","cs5"];
+const NOTE_COUNT = NOTES.length;
+const BPM = 90;
+
+const CYCLE_V1 = 1 / CPS;
+const FULL_PHASE_CYCLE = 1 / (CPS * (SPEED_RATIO - 1));
+
+const NOTE_COLORS = {
+  e4:  '#e0654f',
+  fs4: '#d9a54a',
+  b4:  '#4ac3b0',
+  cs5: '#9b7fd9',
+  d5:  '#5a9bd9'
+};
+const NOTE_LABELS = { e4:'Mi', fs4:'Fa♯', b4:'Si', cs5:'Do♯', d5:'Re' };
+
+// frecuencias reales de cada nota (Hz) — el mismo mapeo que usarías en Strudel con note()
+const NOTE_FREQ = { e4: 329.63, fs4: 369.99, b4: 493.88, cs5: 554.37, d5: 587.33 };
+
+let audioCtx = null;
+let muted = false;
+let masterGain = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = parseFloat(volumeSlider.value);
+    masterGain.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+// un tono simple tipo piano: fundamental + un armónico suave, con ataque rápido y decaimiento natural
+function playNote(freq, velocity) {
+  if (!audioCtx || muted) return;
+  const t0 = audioCtx.currentTime;
+
+  // filtro general que empieza brillante (golpe del martillo) y se oscurece con el tiempo,
+  // como el timbre real de un piano perdiendo agudos mientras suena
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(5200, t0);
+  filter.frequency.exponentialRampToValueAtTime(900, t0 + 2.6);
+  filter.Q.value = 0.3;
+  filter.connect(masterGain);
+
+  // síntesis aditiva: varios armónicos en onda sinusoidal (sin buzz de triangular/cuadrada),
+  // cada uno con su propio decaimiento — los agudos se apagan primero, como en un piano real
+  const harmonics = [
+    { mult: 1,    gain: 0.5,   decay: 3.2  }, // fundamental — el cuerpo del sonido, dura más
+    { mult: 2,    gain: 0.22,  decay: 2.0  },
+    { mult: 3,    gain: 0.10,  decay: 1.1  },
+    { mult: 4.02, gain: 0.045, decay: 0.6  }, // muy leve desafinación — evita que suene a sintetizador puro
+    { mult: 6.03, gain: 0.02,  decay: 0.35 },
+  ];
+
+  harmonics.forEach(h => {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq * h.mult;
+
+    const g = audioCtx.createGain();
+    const peak = velocity * h.gain;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.006); // ataque casi instantáneo, como el martillo
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + h.decay);
+
+    osc.connect(g).connect(filter);
+    osc.start(t0);
+    osc.stop(t0 + h.decay + 0.1);
+  });
+}
+
+let lastActiveK1 = -1, lastActiveK2 = -1; // para detectar el cambio de nota y disparar el sonido una sola vez
+
+const R_MIN = 55, R_MAX = 255;
+const TURNS = 2; // menos vueltas, más separadas — antes eran 3 y quedaban muy pegadas
+const STEPS_PER_NOTE = 34;
+const TOTAL_STEPS = NOTE_COUNT * STEPS_PER_NOTE;
+
+let running = false, startTs = null, elapsed = 0, rafId = null, wasUnity = false;
+let ledInterval = null;
+
+const flashEl = document.getElementById('flash');
+const stateLabel = document.getElementById('stateLabel');
+const timerDisplay = document.getElementById('timerDisplay');
+const toggleBtn = document.getElementById('toggleBtn');
+const led = document.getElementById('led');
+const metroLabel = document.querySelector('.metroLabel');
+
+const legend = document.getElementById('legend');
+Object.keys(NOTE_LABELS).forEach(n => {
+  const el = document.createElement('div');
+  el.className = 'legendItem';
+  el.innerHTML = `<span class="legendDot" style="background:${NOTE_COLORS[n]}"></span>${NOTE_LABELS[n]}`;
+  legend.appendChild(el);
+});
+
+// --- textura de grano, generada una sola vez fuera de pantalla ---
+const grainCanvas = document.createElement('canvas');
+grainCanvas.width = 160; grainCanvas.height = 160;
+const gctx = grainCanvas.getContext('2d');
+const gimg = gctx.createImageData(160,160);
+for (let i = 0; i < gimg.data.length; i += 4) {
+  const v = Math.random() * 255;
+  gimg.data[i] = v; gimg.data[i+1] = v; gimg.data[i+2] = v;
+  gimg.data[i+3] = Math.random() * 14; // muy sutil
+}
+gctx.putImageData(gimg, 0, 0);
+const grainPattern = ctx.createPattern(grainCanvas, 'repeat');
+
+// --- dos teclados espejados, rango Do4-Re5 (más amplio, más reconocible como piano real) ---
+// Voz 1 abajo, en su orientación normal — Voz 2 arriba, invertida como un reflejo
+const KB_WHITE_KEYS = ['c4','d4','e4','f4','g4','a4','b4','c5','d5']; // 9 blancas
+const KB_BLACK_KEYS = { cs4: 0.5, ds4: 1.5, fs4: 3.5, gs4: 4.5, as4: 5.5, cs5: 7.5 };
+const KB_H = 78;
+const KB_MARGIN = 60;
+const KB_WHITE_W = (W - KB_MARGIN * 2) / KB_WHITE_KEYS.length;
+const KB_BOTTOM_Y = H - 100;      // Voz 1
+const KB_TOP_Y = KB_BOTTOM_Y - KB_H; // Voz 2 — pegado justo encima, es su espejo
+
+function drawPianoRow(y, activeNote, env, mirrored) {
+  // sin transformar el contexto (ctx.scale con negativos rompe el shadowBlur en algunos
+  // navegadores) — en vez de eso, calculamos a mano dónde cae cada tecla negra espejada
+  KB_WHITE_KEYS.forEach((note, i) => {
+    const x = KB_MARGIN + i * KB_WHITE_W;
+    const isActive = note === activeNote;
+    const e = isActive ? env : 0;
+    const color = NOTE_COLORS[note] || 'rgba(255,255,255,1)';
+
+    ctx.globalAlpha = 0.055;
+    ctx.fillStyle = 'rgba(255,255,255,1)';
+    ctx.fillRect(x, y, KB_WHITE_W, KB_H);
+
+    if (e > 0.02) {
+      ctx.globalAlpha = 0.15 + e * 0.55;
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 16 * e;
+      ctx.fillRect(x, y, KB_WHITE_W, KB_H);
+      ctx.shadowBlur = 0;
+    }
+  });
+
+  const blackW = KB_WHITE_W * 0.58;
+  const blackH = KB_H * 0.62;
+  // normal: la negra cuelga desde arriba (cerca de la espiral). espejada: cuelga desde
+  // abajo (cerca de la costura) — así ambos teclados son reflejo exacto uno del otro
+  const blackY = mirrored ? y + KB_H - blackH : y;
+
+  Object.entries(KB_BLACK_KEYS).forEach(([note, pos]) => {
+    const x = KB_MARGIN + pos * KB_WHITE_W - blackW / 2;
+    const isActive = note === activeNote;
+    const e = isActive ? env : 0;
+    const color = NOTE_COLORS[note] || 'rgba(20,18,26,1)';
+
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    ctx.fillRect(x, blackY, blackW, blackH);
+
+    if (e > 0.02) {
+      ctx.globalAlpha = 0.2 + e * 0.6;
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 16 * e;
+      ctx.fillRect(x, blackY, blackW, blackH);
+      ctx.shadowBlur = 0;
+    }
+  });
+
+  ctx.globalAlpha = 1;
+}
+
+// desvanecido suave en los bordes de cada teclado, para que no corten en seco contra el fondo
+function drawKeyboardFade(y, fromTop) {
+  const g = ctx.createLinearGradient(0, fromTop ? y : y + KB_H, 0, fromTop ? y + KB_H * 0.4 : y + KB_H * 0.6);
+  if (fromTop) {
+    g.addColorStop(0, 'rgba(8,8,15,0)');
+    g.addColorStop(1, 'rgba(8,8,15,0.85)');
+  } else {
+    g.addColorStop(0, 'rgba(8,8,15,0.85)');
+    g.addColorStop(1, 'rgba(8,8,15,0)');
+  }
+  ctx.fillStyle = g;
+  ctx.fillRect(0, y - 10, W, KB_H + 20);
+}
+
+function drawKeyboards(activeNote1, env1, activeNote2, env2) {
+  drawPianoRow(KB_BOTTOM_Y, activeNote1, env1, false); // Voz 1, abajo, normal
+  drawPianoRow(KB_TOP_Y, activeNote2, env2, true);      // Voz 2, arriba, espejada
+}
+
+
+// representación gráfica del "código en acción" — no texto literal, solo la sugerencia de líneas
+// de código como un párrafo garabateado, decreciendo en longitud, con un leve movimiento orgánico
+const CODE_LINES = [
+  { y: 46,  len: 210, wob: 14, seg: 9  },
+  { y: 68,  len: 175, wob: 10, seg: 7  },
+  { y: 90,  len: 145, wob: 8,  seg: 6  },
+  { y: 112, len: 118, wob: 7,  seg: 5  },
+  { y: 134, len: 95,  wob: 6,  seg: 4  },
+  { y: 156, len: 70,  wob: 5,  seg: 4  },
+  { y: 178, len: 48,  wob: 4,  seg: 3  },
+];
+
+function drawCodeGlyph(t) {
+  ctx.save();
+  const originX = 46, originY = 20;
+
+  CODE_LINES.forEach((line, i) => {
+    const drift = Math.sin(t * 0.35 + i * 1.3) * 1.5; // respiración muy leve, no ruido
+    ctx.beginPath();
+    for (let s = 0; s <= line.seg; s++) {
+      const px = originX + (s / line.seg) * line.len;
+      const py = originY + line.y + Math.sin(s * 1.7 + i * 2.1) * line.wob * 0.5 + drift;
+      if (s === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = 'rgba(233,230,220,0.4)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+function formatTime(sec) {
+  const m = Math.floor(sec/60), s = Math.floor(sec%60);
+  return m + ':' + s.toString().padStart(2,'0');
+}
+
+function drawBackground(t) {
+  // fondo profundo, descentrado — no un negro plano
+  const g = ctx.createRadialGradient(cx - 60, cy - 90, 20, cx, cy, R_MAX + 220);
+  g.addColorStop(0, '#171220');
+  g.addColorStop(0.45, '#0e0c14');
+  g.addColorStop(1, '#050408');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // anillos concéntricos tenues, como ondas de agua — muy sutiles, respiran con el tiempo
+  for (let i = 1; i <= 6; i++) {
+    const breathe = 1 + Math.sin(t * 0.15 + i) * 0.01;
+    ctx.beginPath();
+    ctx.arc(cx, cy, (R_MIN - 15 + i * 48) * breathe, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,255,255,${0.015 + i*0.003})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // grano
+  ctx.fillStyle = grainPattern;
+  ctx.fillRect(0, 0, W, H);
+
+  // viñeta
+  const vg = ctx.createRadialGradient(cx, cy + 60, R_MAX * 0.55, cx, cy + 60, H*0.62);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// envolvente de ataque/decaimiento para el glow de una nota (0..1), en vez de encendido/apagado binario
+function noteEnvelope(localFrac) {
+  const attack = 0.10;   // sube rápido al entrar la nota
+  const release = 0.55;  // a partir de aquí empieza a apagarse
+  if (localFrac < attack) {
+    return localFrac / attack; // rampa de subida
+  }
+  if (localFrac < release) {
+    return 1; // sostenido
+  }
+  // decaimiento exponencial suave hacia el fondo, sin llegar a cero abrupto
+  const t = (localFrac - release) / (1 - release);
+  return Math.max(0, 1 - t) * Math.exp(-t * 1.6) + (1 - Math.exp(-t*1.6)) * 0.18;
+}
+
+function drawSpiral(rotation, activeIdx, dim, t, localFrac) {
+  const breathe = 0.6 + Math.sin(t * 2.4 + (dim ? 1.7 : 0)) * 0.4;
+  const env = noteEnvelope(localFrac);
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (let s = 0; s < TOTAL_STEPS; s++) {
+    const noteIdx = Math.floor(s / STEPS_PER_NOTE);
+    const t0 = s / TOTAL_STEPS, t1 = (s+1) / TOTAL_STEPS;
+    const a0 = t0 * Math.PI * 2 * TURNS + rotation;
+    const a1 = t1 * Math.PI * 2 * TURNS + rotation;
+    const r0 = R_MIN + t0 * (R_MAX - R_MIN);
+    const r1 = R_MIN + t1 * (R_MAX - R_MIN);
+    const x0 = cx + Math.cos(a0) * r0, y0 = cy + Math.sin(a0) * r0;
+    const x1 = cx + Math.cos(a1) * r1, y1 = cy + Math.sin(a1) * r1;
+
+    const isActive = noteIdx === activeIdx;
+    const color = NOTE_COLORS[NOTES[noteIdx]];
+
+    const baseAlpha = dim ? 0.22 : 0.55;
+    const peakAlpha = dim ? 0.92 : 1;
+    const baseWidth = dim ? 7 : 8.5;
+    const peakWidth = dim ? 12 : 14;
+
+    const localEnv = isActive ? env : 0;
+
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = baseAlpha + (peakAlpha - baseAlpha) * localEnv;
+    ctx.lineWidth = baseWidth + (peakWidth - baseWidth) * localEnv;
+
+    if (localEnv > 0.02) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = (10 + breathe * 8) * localEnv;
+    } else {
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+}
+
+function draw(t) {
+  ctx.clearRect(0, 0, W, H);
+  drawBackground(t);
+
+  const phaseV1 = (t / CYCLE_V1) % 1;
+  const phaseV2 = ((t * SPEED_RATIO) / CYCLE_V1) % 1;
+  const rawK1 = phaseV1 * NOTE_COUNT;
+  const rawK2 = phaseV2 * NOTE_COUNT;
+  const activeK1 = Math.floor(rawK1);
+  const activeK2 = Math.floor(rawK2);
+  const localFrac1 = rawK1 - activeK1; // 0..1 dentro de la nota actual de Voz 1
+  const localFrac2 = rawK2 - activeK2; // 0..1 dentro de la nota actual de Voz 2
+
+  // dispara el sonido real justo cuando cada voz entra a una nota nueva
+  if (running) {
+    if (activeK1 !== lastActiveK1) {
+      playNote(NOTE_FREQ[NOTES[activeK1]], 0.5);
+      lastActiveK1 = activeK1;
+    }
+    if (activeK2 !== lastActiveK2) {
+      playNote(NOTE_FREQ[NOTES[activeK2]], 0.4);
+      lastActiveK2 = activeK2;
+    }
+  }
+
+  const relRotation = (t / FULL_PHASE_CYCLE) * Math.PI * 2;
+  const dist = Math.min((relRotation % (Math.PI*2)), (Math.PI*2) - (relRotation % (Math.PI*2)));
+  const unity = 1 - (dist / Math.PI);
+
+  drawSpiral(0, activeK1, false, t, localFrac1);
+  drawSpiral(relRotation, activeK2, true, t, localFrac2);
+
+  drawKeyboards(
+    NOTES[activeK1], noteEnvelope(localFrac1),
+    NOTES[activeK2], noteEnvelope(localFrac2)
+  );
+  drawKeyboardFade(KB_TOP_Y, true);
+  drawKeyboardFade(KB_BOTTOM_Y, false);
+
+  // punto central — respira siempre, esté o no en pausa
+  const pulse = 2.4 + Math.sin(t * 1.6) * 0.8;
+  ctx.beginPath();
+  ctx.arc(cx, cy, pulse, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.shadowColor = 'rgba(255,255,255,0.6)';
+  ctx.shadowBlur = 8;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  if (unity > 0.9) {
+    flashEl.style.opacity = ((unity - 0.9)/0.1).toFixed(2);
+    if (!wasUnity) { stateLabel.textContent = 'las dos espirales vuelven a calzar'; stateLabel.classList.add('unity'); }
+    wasUnity = true;
+  } else {
+    flashEl.style.opacity = 0;
+    if (wasUnity) { stateLabel.textContent = 'la Voz 2 empieza a girar de nuevo'; stateLabel.classList.remove('unity'); }
+    wasUnity = false;
+  }
+
+  timerDisplay.textContent = formatTime(t) + ' / vuelta completa ≈ 2:13';
+}
+
+function loop(ts) {
+  if (!running) return;
+  if (startTs === null) startTs = ts;
+  const t = (ts - startTs)/1000 + elapsed;
+  draw(t);
+  rafId = requestAnimationFrame(loop);
+}
+
+function startMetronome() {
+  const beatMs = (60/BPM) * 1000;
+  led.classList.add('on');
+  setTimeout(() => led.classList.remove('on'), 90);
+  ledInterval = setInterval(() => {
+    led.classList.add('on');
+    setTimeout(() => led.classList.remove('on'), 90);
+  }, beatMs);
+}
+function stopMetronome() {
+  clearInterval(ledInterval);
+  led.classList.remove('on');
+}
+
+// compás de alzar: 4 tiempos visuales (LED + conteo), sin sonido, antes de arrancar de verdad
+function runCountIn(onDone) {
+  const beatMs = (60/BPM) * 1000;
+  let beat = 4;
+  metroLabel.textContent = 'alzar: ' + beat;
+  led.classList.add('on');
+  setTimeout(() => led.classList.remove('on'), 90);
+
+  const interval = setInterval(() => {
+    beat--;
+    if (beat === 0) {
+      clearInterval(interval);
+      metroLabel.textContent = '90 bpm';
+      onDone();
+      return;
+    }
+    metroLabel.textContent = 'alzar: ' + beat;
+    led.classList.add('on');
+    setTimeout(() => led.classList.remove('on'), 90);
+  }, beatMs);
+}
+
+const muteBtn = document.getElementById('muteBtn');
+const volumeSlider = document.getElementById('volumeSlider');
+
+volumeSlider.addEventListener('input', () => {
+  if (masterGain) masterGain.gain.value = parseFloat(volumeSlider.value);
+});
+
+muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  muteBtn.textContent = muted ? '🔇 Sonido apagado' : '🔊 Silenciar';
+});
+
+toggleBtn.addEventListener('click', () => {
+  if (!running) {
+    ensureAudio(); // debe llamarse dentro del gesto del clic para que el navegador permita el audio
+    lastActiveK1 = -1; lastActiveK2 = -1; // para que la primera nota sí suene al arrancar
+    toggleBtn.disabled = true;
+    runCountIn(() => {
+      toggleBtn.disabled = false;
+      running = true;
+      toggleBtn.textContent = '⏸ Pausar';
+      startTs = null;
+      rafId = requestAnimationFrame(loop);
+      startMetronome();
+    });
+  } else {
+    running = false;
+    toggleBtn.textContent = '▶ Iniciar';
+    elapsed += (performance.now() - startTs)/1000;
+    cancelAnimationFrame(rafId);
+    stopMetronome();
+  }
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  running = false; elapsed = 0; startTs = null;
+  lastActiveK1 = -1; lastActiveK2 = -1;
+  toggleBtn.textContent = '▶ Iniciar';
+  toggleBtn.disabled = false;
+  cancelAnimationFrame(rafId);
+  stopMetronome();
+  metroLabel.textContent = '90 bpm';
+  wasUnity = false;
+  stateLabel.textContent = 'las dos espirales comienzan alineadas';
+  stateLabel.classList.remove('unity');
+  draw(0);
+});
+
+draw(0);
+</script>
+</body>
+</html>
